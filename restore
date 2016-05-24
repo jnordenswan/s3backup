@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -e
+
+if [ -z "$1" ] || [ -z "$2" ]
+  then
+    echo "Please specify filename and target directory"
+    exit
+fi
+
+source ~/apps/aws/bin/activate
+
+FILENAME="$1"
+TARGET="$2"
+SIZE=$( aws s3 ls --region eu-west-1 s3://s3attic/$FILENAME | awk '{print $3}' )
+
+if [ -z "$SIZE" ]
+  then
+    echo "$FILENAME not found"
+    exit
+fi
+
+echo "Restoring $FILENAME to $TARGET, $SIZE bytes to copy..."
+
+aws s3 cp --expected-size $SIZE --region eu-west-1 s3://s3attic/$FILENAME - \
+  | pv -pterabWs $SIZE \
+  | ccrypt -d \
+  | pigz -d \
+  | tar -xf - -C $TARGET --atime-preserve

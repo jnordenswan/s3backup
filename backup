@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+source ~/apps/aws/bin/activate
+
+DATE=$( date +%s )
+TARGET="$1"
+SIZE=$( du -bs $TARGET | cut -f 1 )
+
+echo "Enter encryption key:"
+read -s KEY1
+echo "Enter encryption key (again):"
+read -s KEY2
+
+export KEY1
+export KEY2
+
+if [ "$KEY1" != "$KEY2" ]
+  then
+    echo "Keys do not match. Aborting."
+    exit
+fi
+
+unset KEY2
+
+tar -cf - $TARGET 2>/dev/null \
+  | pv -pterabWs $SIZE \
+  | pigz -8 \
+  | ccrypt -E KEY1 \
+  | aws s3 cp --expected-size $SIZE --storage-class STANDARD_IA --region eu-west-1 - s3://s3attic/$DATE.tgz.cpt
